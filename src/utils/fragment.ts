@@ -1,0 +1,7 @@
+import { BaseFragment } from '@codama/renderers-core';
+
+import { ImportMap } from '../ImportMap';
+
+export type Fragment = BaseFragment & {
+    imports: ImportMap;
+};

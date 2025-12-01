@@ -1,4 +1,7 @@
-import { TypeManifest } from './getTypeManifestVisitor';
+import type { TypeManifest } from './getTypeManifestVisitor';
+
+/** Rust keywords that should not be identified as crate names. */
+export const RUST_CORE_IMPORTS = new Set(['std', 'crate', 'super', 'self', 'core', 'alloc', 'clippy']);
 
 const DEFAULT_MODULE_MAP: Record<string, string> = {
     generated: 'crate::generated',
@@ -69,6 +72,11 @@ export class ImportMap {
         this._imports.forEach(i => newImportMap.add(resolveDependency(i)));
         this._aliases.forEach((alias, i) => newImportMap.addAlias(resolveDependency(i), alias));
         return newImportMap;
+    }
+
+    getExternalDependencies(dependencyMap: Record<string, string>): Set<string> {
+        const resolvedMap = this.resolveDependencyMap(dependencyMap);
+        return new Set([...resolvedMap._imports].map(i => i.split('::')[0]).filter(i => !RUST_CORE_IMPORTS.has(i)));
     }
 
     toString(dependencies: Record<string, string>): string {
