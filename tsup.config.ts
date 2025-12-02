@@ -38,5 +38,6 @@ function getBuildConfig(options: BuildOptions): TsupConfig {
         publicDir: true,
         pure: ['process'],
         sourcemap: true,
+        treeshake: true,
     };
 }
