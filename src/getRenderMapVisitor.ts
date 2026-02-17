@@ -30,6 +30,8 @@ import { getTypeManifestVisitor } from './getTypeManifestVisitor';
 import { ImportMap } from './ImportMap';
 import { renderValueNode } from './renderValueNodeVisitor';
 import {
+    CargoDependencies,
+    Fragment,
     getDiscriminatorConstants,
     getImportFromFactory,
     getTraitsFromNodeFactory,
@@ -42,6 +44,7 @@ export type GetRenderMapOptions = {
     anchorTraits?: boolean;
     defaultTraitOverrides?: string[];
     dependencyMap?: Record<string, string>;
+    dependencyVersions?: CargoDependencies;
     linkOverrides?: LinkOverrides;
     renderParentInstructions?: boolean;
     traitOptions?: TraitOptions;
@@ -64,7 +67,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
     const anchorTraits = options.anchorTraits ?? true;
 
     return pipe(
-        staticVisitor(() => createRenderMap(), {
+        staticVisitor(() => createRenderMap<Fragment>(), {
             keys: ['rootNode', 'programNode', 'instructionNode', 'accountNode', 'definedTypeNode'],
         }),
         v =>
@@ -107,11 +110,10 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                         .filter(isNodeFilter('constantPdaSeedNode'))
                         .filter(seed => !isNode(seed.value, 'programIdValueNode'));
 
-                    const { imports } = typeManifest;
-
-                    if (hasVariableSeeds) {
-                        imports.mergeWith(seedsImports);
-                    }
+                    const imports = typeManifest.imports
+                        .mergeWith(...(hasVariableSeeds ? [seedsImports] : []))
+                        .mergeWith(discriminatorConstants.imports)
+                        .remove(`generatedAccounts::${pascalCase(node.name)}`);
 
                     return createRenderMap(`accounts/${snakeCase(node.name)}.rs`, {
                         content: render('accountsPage.njk', {
@@ -120,28 +122,29 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                             constantSeeds,
                             discriminatorConstants: discriminatorConstants.render,
                             hasVariableSeeds,
-                            imports: imports
-                                .mergeWith(discriminatorConstants.imports)
-                                .remove(`generatedAccounts::${pascalCase(node.name)}`)
-                                .toString(dependencyMap),
+                            imports: imports.toString(dependencyMap),
                             pda,
                             program,
                             seeds,
                             typeManifest,
                         }),
+                        imports,
                     });
                 },
 
                 visitDefinedType(node) {
                     const typeManifest = visit(node, typeManifestVisitor);
-                    const imports = new ImportMap().mergeWithManifest(typeManifest);
+                    const imports = new ImportMap()
+                        .mergeWithManifest(typeManifest)
+                        .remove(`generatedTypes::${pascalCase(node.name)}`);
 
                     return createRenderMap(`types/${snakeCase(node.name)}.rs`, {
                         content: render('definedTypesPage.njk', {
                             definedType: node,
-                            imports: imports.remove(`generatedTypes::${pascalCase(node.name)}`).toString(dependencyMap),
+                            imports: imports.toString(dependencyMap),
                             typeManifest,
                         }),
+                        imports,
                     });
                 },
 
@@ -231,7 +234,10 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                     const typeManifest = visit(struct, structVisitor);
 
                     const dataTraits = getTraitsFromNode(node);
-                    imports.mergeWith(dataTraits.imports);
+                    imports
+                        .mergeWith(dataTraits.imports)
+                        .mergeWith(discriminatorConstants.imports)
+                        .remove(`generatedInstructions::${pascalCase(node.name)}`);
 
                     return createRenderMap(`instructions/${snakeCase(node.name)}.rs`, {
                         content: render('instructionsPage.njk', {
@@ -239,15 +245,13 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                             discriminatorConstants: discriminatorConstants.render,
                             hasArgs,
                             hasOptional,
-                            imports: imports
-                                .mergeWith(discriminatorConstants.imports)
-                                .remove(`generatedInstructions::${pascalCase(node.name)}`)
-                                .toString(dependencyMap),
+                            imports: imports.toString(dependencyMap),
                             instruction: node,
                             instructionArgs,
                             program,
                             typeManifest,
                         }),
+                        imports,
                     });
                 },
 
@@ -269,6 +273,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                                 imports: new ImportMap().toString(dependencyMap),
                                 program: node,
                             }),
+                            imports: new ImportMap(),
                         });
                     }
 
@@ -301,21 +306,29 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                     return mergeRenderMaps([
                         createRenderMap({
                             ['accounts/mod.rs']:
-                                accountsToExport.length > 0 ? { content: render('accountsMod.njk', ctx) } : undefined,
+                                accountsToExport.length > 0
+                                    ? { content: render('accountsMod.njk', ctx), imports: new ImportMap() }
+                                    : undefined,
                             ['errors/mod.rs']:
-                                programsToExport.length > 0 ? { content: render('errorsMod.njk', ctx) } : undefined,
+                                programsToExport.length > 0
+                                    ? { content: render('errorsMod.njk', ctx), imports: new ImportMap() }
+                                    : undefined,
                             ['instructions/mod.rs']:
                                 instructionsToExport.length > 0
-                                    ? { content: render('instructionsMod.njk', ctx) }
+                                    ? { content: render('instructionsMod.njk', ctx), imports: new ImportMap() }
                                     : undefined,
-                            ['mod.rs']: { content: render('rootMod.njk', ctx) },
+                            ['mod.rs']: { content: render('rootMod.njk', ctx), imports: new ImportMap() },
                             ['programs.rs']:
-                                programsToExport.length > 0 ? { content: render('programsMod.njk', ctx) } : undefined,
+                                programsToExport.length > 0
+                                    ? { content: render('programsMod.njk', ctx), imports: new ImportMap() }
+                                    : undefined,
                             ['shared.rs']:
-                                accountsToExport.length > 0 ? { content: render('sharedPage.njk', ctx) } : undefined,
+                                accountsToExport.length > 0
+                                    ? { content: render('sharedPage.njk', ctx), imports: new ImportMap() }
+                                    : undefined,
                             ['types/mod.rs']:
                                 definedTypesToExport.length > 0
-                                    ? { content: render('definedTypesMod.njk', ctx) }
+                                    ? { content: render('definedTypesMod.njk', ctx), imports: new ImportMap() }
                                     : undefined,
                         }),
                         ...getAllPrograms(node).map(p => visit(p, self)),

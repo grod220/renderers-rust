@@ -1,14 +1,16 @@
 import { logError, logWarn } from '@codama/errors';
-import { deleteDirectory, writeRenderMapVisitor } from '@codama/renderers-core';
+import { deleteDirectory, writeRenderMap } from '@codama/renderers-core';
 import { rootNodeVisitor, visit } from '@codama/visitors-core';
 import { spawnSync } from 'child_process';
 
 import { GetRenderMapOptions, getRenderMapVisitor } from './getRenderMapVisitor';
+import { syncCargoToml } from './utils';
 
 export type RenderOptions = GetRenderMapOptions & {
     crateFolder?: string;
     deleteFolderBeforeRendering?: boolean;
     formatCode?: boolean;
+    syncCargoToml?: boolean;
     toolchain?: string;
 };
 
@@ -20,7 +22,11 @@ export function renderVisitor(path: string, options: RenderOptions = {}) {
         }
 
         // Render the new files.
-        visit(root, writeRenderMapVisitor(getRenderMapVisitor(options), path));
+        const renderMap = visit(root, getRenderMapVisitor(options));
+        writeRenderMap(renderMap, path);
+
+        // Sync Cargo.toml dependencies and versions, if requested.
+        syncCargoToml(renderMap, options);
 
         // format the code
         if (options.formatCode) {
