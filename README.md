@@ -70,8 +70,6 @@ const traitOptions = {
     baseDefaults: [
         'borsh::BorshSerialize',
         'borsh::BorshDeserialize',
-        'serde::Serialize',
-        'serde::Deserialize',
         'Clone',
         'Debug',
         'Eq',
@@ -114,7 +112,15 @@ Now, if at any point, we encounter a `fruits::Apple` or `fruits::Banana` trait t
 #[cfg_attr(feature = "fruits", derive(fruits::Apple, fruits::Banana))]
 ```
 
-By default, the `featureFlags` option is set to the following:
+By default, the `featureFlags` option is empty:
+
+```ts
+const traitOptions = {
+    featureFlags: {},
+};
+```
+
+If you want to make `serde` derives optional behind a `serde` feature, you may configure it like this:
 
 ```ts
 const traitOptions = {
