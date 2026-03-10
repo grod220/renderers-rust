@@ -67,14 +67,7 @@ Note that you must provide the fully qualified name of the traits you provide (e
 
 ```ts
 const traitOptions = {
-    baseDefaults: [
-        'borsh::BorshSerialize',
-        'borsh::BorshDeserialize',
-        'Clone',
-        'Debug',
-        'Eq',
-        'PartialEq',
-    ],
+    baseDefaults: ['borsh::BorshSerialize', 'borsh::BorshDeserialize', 'Clone', 'Debug', 'Eq', 'PartialEq'],
     dataEnumDefaults: [],
     scalarEnumDefaults: ['Copy', 'PartialOrd', 'Hash', 'num_derive::FromPrimitive'],
     structDefaults: [],
